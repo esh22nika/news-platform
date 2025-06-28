@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify
 from google.cloud import firestore
 from google.auth import default
 import logging
+from google.cloud import pubsub_v1
+import json
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -97,6 +99,18 @@ def update_user(user_id):
     except Exception as e:
         logging.error(f"Error updating user: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
+PROJECT_ID = "news-platform-demo-464212"
+
+@app.route('/engagement', methods=['POST'])
+def handle_engagement():
+    data = request.get_json()
+    publisher = pubsub_v1.PublisherClient()
+    topic_path = publisher.topic_path(PROJECT_ID, 'user-clicks')
+
+    future = publisher.publish(topic_path, json.dumps(data).encode())
+    future.result()
+
+    return jsonify({"message": "Event published"}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
