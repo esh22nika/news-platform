@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personalized News Feed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        .news-article {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .news-article:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .article-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .article-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        .article-content {
+            line-height: 1.6;
+            color: #444;
+        }
+        .engagement-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background-color 0.2s;
+        }
+        .btn-like { background-color: #e3f2fd; color: #1976d2; }
+        .btn-like:hover { background-color: #bbdefb; }
+        .btn-share { background-color: #f3e5f5; color: #7b1fa2; }
+        .btn-share:hover { background-color: #e1bee7; }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📰 Personalized News Feed</h1>
+        <p>Your AI-powered news experience</p>
+    </div>
+
+    <div id="loading" class="loading">Loading news articles...</div>
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="news-container"></div>
+
+    <script>
+        // Configuration - Replace with your actual service URLs
+        const CONFIG = {
+            NEWS_SERVICE_URL: 'YOUR_NEWS_SERVICE_URL', // Replace this
+            USER_ID: Math.floor(Math.random() * 1000) + 1, // Random user ID for demo
+            SESSION_ID: 'session_' + Date.now()
+        };
+
+        let readingStartTime = {};
+
+        // Load news articles
+        async function loadNews() {
+            try {
+                const response = await fetch(`${CONFIG.NEWS_SERVICE_URL}/news?limit=10`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayNews(data.articles);
+                document.getElementById('loading').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error loading news:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to load news articles. Please try again later.';
+            }
+        }
+
+        // Display news articles
+        function displayNews(articles) {
+            const container = document.getElementById('news-container');
+            container.innerHTML = '';
+
+            articles.forEach(article => {
+                const articleElement = document.createElement('div');
+                articleElement.className = 'news-article';
+                articleElement.setAttribute('data-article-id', article.article_id);
+                
+                articleElement.innerHTML = `
+                    <div class="article-title">${article.title}</div>
+                    <div class="article-meta">
+                        ${article.category.toUpperCase()} • ${article.source} • ${formatDate(article.publish_date)}
+                    </div>
+                    <div class="article-content">${article.content}</div>
+                    <div class="engagement-buttons">
+                        <button class="btn btn-like" onclick="trackEngagement('${article.article_id}', 'like')">
+                            👍 Like
+                        </button>
+                        <button class="btn btn-share" onclick="trackEngagement('${article.article_id}', 'share')">
+                            📤 Share
+                        </button>
+                    </div>
+                `;
+
+                // Track click event
+                articleElement.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('btn')) {
+                        trackEngagement(article.article_id, 'click');
+                        startReadingTimer(article.article_id);
+                    }
+                });
+
+                container.appendChild(articleElement);
+            });
+        }
+
+        // Track user engagement
+        async function trackEngagement(articleId, eventType) {
+            const eventData = {
+                user_id: CONFIG.USER_ID,
+                article_id: articleId,
+                event_type: eventType,
+                timestamp: new Date().toISOString(),
+                session_id: CONFIG.SESSION_ID,
+                device_type: 'web'
+            };
+
+            try {
+                // Publish to Pub/Sub topic based on event type
+                const topicMap = {
+                    'click': 'user-clicks',
+                    'like': 'user-likes',
+                    'share': 'user-shares'
+                };
+
+                // In a real implementation, you'd send this to your backend
+                // which would then publish to Pub/Sub
+                console.log(`Tracking ${eventType} for article ${articleId}:`, eventData);
+                
+                // Simulate API call
+                publishToPubSub(topicMap[eventType], eventData);
+                
+            } catch (error) {
+                console.error('Error tracking engagement:', error);
+            }
+        }
+
+        // Simulate publishing to Pub/Sub (in real app, this would be done via backend)
+        async function publishToPubSub(topic, data) {
+            // This is a placeholder - in production, you'd send this to your backend
+            console.log(`Publishing to ${topic}:`, data);
+            
+            // You could implement a simple endpoint in your news service to handle this
+            // For now, we'll just log it
+        }
+
+        // Start reading timer
+        function startReadingTimer(articleId) {
+            readingStartTime[articleId] = Date.now();
+        }
+
+        // Track reading time when user leaves page or scrolls away
+        window.addEventListener('beforeunload', () => {
+            Object.keys(readingStartTime).forEach(articleId => {
+                const readingTime = (Date.now() - readingStartTime[articleId]) / 1000;
+                if (readingTime > 2) { // Only track if read for more than 2 seconds
+                    trackEngagement(articleId, 'reading_time', { reading_time_seconds: readingTime });
+                }
+            });
+        });
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNews();
+        });
+    </script>
+</body>
+</html>
