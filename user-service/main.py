@@ -12,14 +12,17 @@ logging.basicConfig(level=logging.INFO)
 # Initialize Firestore
 db = firestore.Client()
 
+# health status via curl https://YOUR_URL/health
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy", "service": "user-service"}), 200
 
+# user route
 @app.route('/users', methods=['POST'])
 def create_user():
     try:
-        data = request.get_json()
+        data = request.get_json()   # gets name email and interest
         
         # Validate required fields
         required_fields = ['username', 'email', 'interests']
