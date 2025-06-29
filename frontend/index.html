@@ -1,47 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Personalized News Feed</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Personalized News Feed</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="app-container">
-        <div class="header">
-            <h1>📰 NewsFlow</h1>
-            <p>Your intelligent, personalized news experience</p>
-            
-            <div class="controls">
-                <div class="search-container">
-                    <input type="text" class="search-input" placeholder="Search news articles..." id="searchInput">
-                    <span class="search-icon">🔍</span>
-                </div>
-                <div class="filter-buttons">
-                    <button class="filter-btn active" data-category="all">All</button>
-                    <button class="filter-btn" data-category="technology">Tech</button>
-                    <button class="filter-btn" data-category="business">Business</button>
-                    <button class="filter-btn" data-category="sports">Sports</button>
-                    <button class="filter-btn" data-category="entertainment">Entertainment</button>
-                    <button class="filter-btn" data-category="science">Science</button>
-                </div>
-            </div>
-        </div>
+  <div class="app-container">
 
-        <div id="loading" class="loading">
-            <div class="loading-spinner"></div>
-            Loading personalized news...
+    <!-- ✅ SIGNUP SECTION -->
+    <div id="signup-section" class="signup-container">
+      <h2>Sign Up</h2>
+      <form id="signup-form">
+        <div class="form-group">
+          <label for="username">Name:</label>
+          <input type="text" id="username" required />
         </div>
-        
-        <div id="error" class="error" style="display: none;"></div>
-        
-        <div id="news-container" class="news-grid"></div>
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input type="email" id="email" required />
+        </div>
+        <div class="form-group">
+          <label for="interests">Interests (comma-separated):</label>
+          <input
+            type="text"
+            id="interests"
+            placeholder="e.g. technology, sports"
+            required
+          />
+        </div>
+        <button type="submit" id="signup-btn">Sign Up</button>
+      </form>
+
+      <div
+        id="signup-success"
+        style="display: none; color: green; margin-top: 10px"
+      >
+        🎉 Signup successful!
+      </div>
     </div>
 
-    <button class="floating-action" onclick="scrollToTop()" title="Back to top">↑</button>
+    <!-- ✅ NEWS SECTION (initially hidden) -->
+    <div id="news-section" style="display: none;">
+      <div class="header">
+        <h1>📰 NewsFlow</h1>
+        <p>Your intelligent, personalized news experience</p>
 
-    <div id="toast" class="toast"></div>
+        <div class="controls">
+          <div class="search-container">
+            <input
+              type="text"
+              class="search-input"
+              placeholder="Search news articles..."
+              id="searchInput"
+            />
+            <span class="search-icon">🔍</span>
+          </div>
+          <div class="filter-buttons">
+            <button class="filter-btn active" data-category="all">All</button>
+            <button class="filter-btn" data-category="technology">Tech</button>
+            <button class="filter-btn" data-category="business">Business</button>
+            <button class="filter-btn" data-category="sports">Sports</button>
+            <button class="filter-btn" data-category="entertainment">Entertainment</button>
+            <button class="filter-btn" data-category="science">Science</button>
+          </div>
+        </div>
+      </div>
 
-    <script src="script.js"></script>
+      <div id="loading" class="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        Loading personalized news...
+      </div>
+
+      <div id="error" class="error" style="display: none;"></div>
+
+      <div id="news-container" class="news-grid"></div>
+    </div>
+  </div>
+
+  <button
+    class="floating-action"
+    onclick="scrollToTop()"
+    title="Back to top"
+    style="display: none;"
+    id="backToTopBtn"
+  >
+    ↑
+  </button>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="script.js"></script>
 </body>
 </html>

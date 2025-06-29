@@ -6,7 +6,7 @@ The **Personalized News Feed Platform** is a cloud-native application that deliv
 
 This project uses multiple GCP services to demonstrate scalable microservices, real-time data pipelines, serverless compute, and cloud-native storage.
 
-**Live Demo**: [https://storage.googleapis.com/your-bucket-name/index.html](https://storage.googleapis.com/your-bucket-name/index.html)
+**Live Demo**: [https://storage.googleapis.com/news-platform-demo-frontend/index.html](https://storage.googleapis.com/news-platform-demo-frontend/index.html)
 
 This project satisfies all the Cloud Computing project guidelines: it uses 4+ services, has detailed documentation, and is hosted on a public GitHub repository.
 
