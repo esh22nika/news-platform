@@ -218,7 +218,7 @@ gcloud functions logs read process_engagement --region asia-south1
 
 ---
 
-## 🔍 Example Queries in BigQuery
+##  Example Queries in BigQuery
 
 ```sql
 -- Total likes and shares
