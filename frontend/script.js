@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           // Show news UI, hide signup UI
           document.getElementById("signup-section").style.display = "none";
-          document.getElementById("news-header").style.display = "";
+          document.getElementById("news-section").style.display = "";
           document.getElementById("news-container").style.display = "";
           document.getElementById("backToTopBtn").style.display = "";
 

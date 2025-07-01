@@ -6,9 +6,12 @@ import logging
 from flask import Flask, request, jsonify
 from google.cloud import firestore
 from google.cloud import pubsub_v1
+from flask_cors import CORS
+
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 logging.basicConfig(level=logging.INFO)
 
 # Initialize Firestore
