@@ -7,7 +7,7 @@ import functions_framework
 
 # Initialize BigQuery client
 client = bigquery.Client()
-table_id = "news_platform_demo.user_engagement"
+table_id = "news_platform_new.user_engagement"
 
 @functions_framework.cloud_event
 def process_engagement(cloud_event):
