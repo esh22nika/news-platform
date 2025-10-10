@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 db = firestore.Client()
 
 # Set your GCP Project ID
-PROJECT_ID = "news-platform-demo-464212"
+PROJECT_ID = "news-platform-474717"
 
 # Create Pub/Sub client ONCE, not per request
 publisher = pubsub_v1.PublisherClient()
