@@ -3,49 +3,88 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Personalized News Feed</title>
+  <title>NewsFlow - Personalized News Feed</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-container">
 
-    <!-- ✅ SIGNUP SECTION -->
-    <div id="signup-section" class="signup-container">
-      <h2>Sign Up</h2>
-      <form id="signup-form">
-        <div class="form-group">
-          <label for="username">Name:</label>
-          <input type="text" id="username" required />
+    <!-- ✅ AUTH SECTION (Login/Register) -->
+    <div id="auth-section" class="auth-container">
+      <div class="auth-card">
+        <h1 class="auth-logo">📰 NewsFlow</h1>
+        <p class="auth-subtitle">Your intelligent, personalized news experience</p>
+        
+        <!-- Login Form -->
+        <div id="login-form-container" class="form-container active">
+          <h2>Welcome Back</h2>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-email">Email:</label>
+              <input type="email" id="login-email" placeholder="your@email.com" required />
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password:</label>
+              <input type="password" id="login-password" placeholder="••••••••" required />
+            </div>
+            <button type="submit" class="btn-primary">Log In</button>
+          </form>
+          <p class="form-switch">
+            Don't have an account? 
+            <a href="#" id="show-register">Sign up here</a>
+          </p>
         </div>
-        <div class="form-group">
-          <label for="email">Email:</label>
-          <input type="email" id="email" required />
-        </div>
-        <div class="form-group">
-          <label for="interests">Interests (comma-separated):</label>
-          <input
-            type="text"
-            id="interests"
-            placeholder="e.g. technology, sports"
-            required
-          />
-        </div>
-        <button type="submit" id="signup-btn">Sign Up</button>
-      </form>
 
-      <div
-        id="signup-success"
-        style="display: none; color: green; margin-top: 10px"
-      >
-        🎉 Signup successful!
+        <!-- Register Form -->
+        <div id="register-form-container" class="form-container">
+          <h2>Create Account</h2>
+          <form id="register-form">
+            <div class="form-group">
+              <label for="register-username">Name:</label>
+              <input type="text" id="register-username" placeholder="John Doe" required />
+            </div>
+            <div class="form-group">
+              <label for="register-email">Email:</label>
+              <input type="email" id="register-email" placeholder="your@email.com" required />
+            </div>
+            <div class="form-group">
+              <label for="register-password">Password:</label>
+              <input type="password" id="register-password" placeholder="••••••••" minlength="6" required />
+            </div>
+            <div class="form-group">
+              <label for="register-interests">Interests (comma-separated):</label>
+              <input
+                type="text"
+                id="register-interests"
+                placeholder="technology, sports, business"
+                required
+              />
+            </div>
+            <button type="submit" class="btn-primary">Sign Up</button>
+          </form>
+          <p class="form-switch">
+            Already have an account? 
+            <a href="#" id="show-login">Log in here</a>
+          </p>
+        </div>
+
+        <div id="auth-message" class="auth-message" style="display: none;"></div>
       </div>
     </div>
 
     <!-- ✅ NEWS SECTION (initially hidden) -->
     <div id="news-section" style="display: none;">
       <div class="header">
-        <h1>📰 NewsFlow</h1>
-        <p>Your intelligent, personalized news experience</p>
+        <div class="header-content">
+          <div>
+            <h1>📰 NewsFlow</h1>
+            <p>Your intelligent, personalized news experience</p>
+          </div>
+          <div class="user-menu">
+            <span class="user-name" id="user-name">Welcome!</span>
+            <button class="btn-logout" id="logout-btn">Logout</button>
+          </div>
+        </div>
 
         <div class="controls">
           <div class="search-container">
@@ -59,6 +98,7 @@
           </div>
           <div class="filter-buttons">
             <button class="filter-btn active" data-category="all">All</button>
+            <button class="filter-btn" data-category="recommended">For You</button>
             <button class="filter-btn" data-category="technology">Tech</button>
             <button class="filter-btn" data-category="business">Business</button>
             <button class="filter-btn" data-category="sports">Sports</button>
