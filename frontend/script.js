@@ -1,7 +1,7 @@
 // CONFIG - put your real URLs here
-const NEWS_API_URL = "https://news-service-625238064074.asia-south1.run.app/news";
-const USER_SERVICE_URL = "https://user-service-625238064074.asia-south1.run.app/users";
-const ENGAGEMENT_URL = "https://user-service-625238064074.asia-south1.run.app/engagement";
+const NEWS_API_URL = "https://news-service-news-platform-474717.asia-south1.run.app/news";
+const USER_SERVICE_URL = "https://user-service-news-platform-474717.asia-south1.run.app/users";
+const ENGAGEMENT_URL = "https://user-service-news-platform-474717.asia-south1.run.app/engagement";
 
 let currentUserId = null;
 
