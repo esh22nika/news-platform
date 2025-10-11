@@ -3,82 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NewsFlow - Personalized News Feed</title>
+  <title>NewsFlow - Your Personalized News</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-container">
 
-    <!-- ✅ AUTH SECTION (Login/Register) -->
-    <div id="auth-section" class="auth-container">
+    <!-- 🎨 BEAUTIFUL AUTH SECTION -->
+    <div id="auth-section" class="auth-section">
+      <div class="auth-background">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+      </div>
+      
       <div class="auth-card">
-        <h1 class="auth-logo">📰 NewsFlow</h1>
-        <p class="auth-subtitle">Your intelligent, personalized news experience</p>
-        
+        <div class="auth-header">
+          <div class="logo-container">
+            <div class="logo-icon">📰</div>
+            <h1 class="logo-text">NewsFlow</h1>
+          </div>
+          <p class="tagline">Discover news that matters to you</p>
+        </div>
+
         <!-- Login Form -->
         <div id="login-form-container" class="form-container active">
-          <h2>Welcome Back</h2>
-          <form id="login-form">
-            <div class="form-group">
-              <label for="login-email">Email:</label>
-              <input type="email" id="login-email" placeholder="your@email.com" required />
+          <h2 class="form-title">Welcome Back</h2>
+          <form id="login-form" class="auth-form">
+            <div class="input-group">
+              <label for="login-email">
+                <span class="label-icon">✉️</span>
+                Email Address
+              </label>
+              <input 
+                type="email" 
+                id="login-email" 
+                placeholder="you@example.com" 
+                required 
+                autocomplete="email"
+              />
             </div>
-            <div class="form-group">
-              <label for="login-password">Password:</label>
-              <input type="password" id="login-password" placeholder="••••••••" required />
+            <div class="input-group">
+              <label for="login-password">
+                <span class="label-icon">🔒</span>
+                Password
+              </label>
+              <input 
+                type="password" 
+                id="login-password" 
+                placeholder="Enter your password" 
+                required 
+                autocomplete="current-password"
+              />
             </div>
-            <button type="submit" class="btn-primary">Log In</button>
+            <button type="submit" class="btn-primary">
+              <span>Sign In</span>
+              <span class="btn-arrow">→</span>
+            </button>
           </form>
-          <p class="form-switch">
-            Don't have an account? 
-            <a href="#" id="show-register">Sign up here</a>
-          </p>
+          <div class="form-footer">
+            <p>Don't have an account? 
+              <a href="#" id="show-register" class="link-accent">Create one</a>
+            </p>
+          </div>
         </div>
 
         <!-- Register Form -->
         <div id="register-form-container" class="form-container">
-          <h2>Create Account</h2>
-          <form id="register-form">
-            <div class="form-group">
-              <label for="register-username">Name:</label>
-              <input type="text" id="register-username" placeholder="John Doe" required />
-            </div>
-            <div class="form-group">
-              <label for="register-email">Email:</label>
-              <input type="email" id="register-email" placeholder="your@email.com" required />
-            </div>
-            <div class="form-group">
-              <label for="register-password">Password:</label>
-              <input type="password" id="register-password" placeholder="••••••••" minlength="6" required />
-            </div>
-            <div class="form-group">
-              <label for="register-interests">Interests (comma-separated):</label>
-              <input
-                type="text"
-                id="register-interests"
-                placeholder="technology, sports, business"
-                required
+          <h2 class="form-title">Join NewsFlow</h2>
+          <form id="register-form" class="auth-form">
+            <div class="input-group">
+              <label for="register-username">
+                <span class="label-icon">👤</span>
+                Full Name
+              </label>
+              <input 
+                type="text" 
+                id="register-username" 
+                placeholder="John Doe" 
+                required 
+                autocomplete="name"
               />
             </div>
-            <button type="submit" class="btn-primary">Sign Up</button>
+            <div class="input-group">
+              <label for="register-email">
+                <span class="label-icon">✉️</span>
+                Email Address
+              </label>
+              <input 
+                type="email" 
+                id="register-email" 
+                placeholder="you@example.com" 
+                required 
+                autocomplete="email"
+              />
+            </div>
+            <div class="input-group">
+              <label for="register-password">
+                <span class="label-icon">🔒</span>
+                Password
+              </label>
+              <input 
+                type="password" 
+                id="register-password" 
+                placeholder="At least 6 characters" 
+                minlength="6" 
+                required 
+                autocomplete="new-password"
+              />
+            </div>
+            <div class="input-group">
+              <label for="register-interests">
+                <span class="label-icon">⭐</span>
+                Your Interests
+              </label>
+              <input 
+                type="text" 
+                id="register-interests" 
+                placeholder="technology, sports, business" 
+                required 
+              />
+              <span class="input-hint">Separate with commas</span>
+            </div>
+            <button type="submit" class="btn-primary">
+              <span>Create Account</span>
+              <span class="btn-arrow">→</span>
+            </button>
           </form>
-          <p class="form-switch">
-            Already have an account? 
-            <a href="#" id="show-login">Log in here</a>
-          </p>
+          <div class="form-footer">
+            <p>Already have an account? 
+              <a href="#" id="show-login" class="link-accent">Sign in</a>
+            </p>
+          </div>
         </div>
 
         <div id="auth-message" class="auth-message" style="display: none;"></div>
       </div>
     </div>
 
-    <!-- ✅ NEWS SECTION (initially hidden) -->
+    <!-- NEWS SECTION (initially hidden) -->
     <div id="news-section" style="display: none;">
       <div class="header">
         <div class="header-content">
-          <div>
+          <div class="header-left">
             <h1>📰 NewsFlow</h1>
-            <p>Your intelligent, personalized news experience</p>
+            <p>Your personalized news experience</p>
           </div>
           <div class="user-menu">
             <span class="user-name" id="user-name">Welcome!</span>
