@@ -13,10 +13,10 @@ logging.basicConfig(level=logging.INFO)
 # Initialize clients
 db = firestore.Client()
 storage_client = storage.Client()
-bucket = storage_client.bucket('news-platform-demo-storage-esh')
+bucket = storage_client.bucket('news-platform-assets-new')
 
 # news api key is hardcoded for now cuz env var not working
-NEWS_API_KEY = 'f5d162384070494ebc5e8ab3f9a5ae8b'
+NEWS_API_KEY = 'ae5d578c6235410d864d5be2af511cce'
 
 @app.route('/health', methods=['GET'])
 def health_check():
