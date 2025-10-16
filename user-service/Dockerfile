@@ -11,3 +11,5 @@ COPY . .
 EXPOSE 8080
 
 CMD exec gunicorn main:app --bind :8080 --workers 1 --threads 8 --timeout 0
+
+
