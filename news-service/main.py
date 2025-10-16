@@ -1,7 +1,6 @@
-# news-service/main.py - COMPLETE FIX
 import os
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from google.cloud import firestore
 import logging
@@ -18,6 +17,9 @@ db = firestore.Client()
 
 # News API key
 NEWS_API_KEY = 'ae5d578c6235410d864d5be2af511cce'
+
+# Placeholder image URL for missing or blocked images
+PLACEHOLDER_IMAGE = 'https://placehold.co/400x200/3b82f6/ffffff/png?text=News'
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -107,7 +109,7 @@ def store_articles(articles, category):
             # Handle image URL - use placeholder for blocked images
             image_url = article.get('urlToImage', '')
             if not image_url or 'wsj.com' in image_url.lower():
-                image_url = 'https://via.placeholder.com/400x200/3b82f6/ffffff?text=News+Article'
+                image_url = PLACEHOLDER_IMAGE
             
             # Create article document
             article_data = {
@@ -174,8 +176,9 @@ def get_news():
                 article_data['article_id'] = doc.id
             
             # Ensure image_url has fallback
-            if not article_data.get('image_url'):
-                article_data['image_url'] = 'https://via.placeholder.com/400x200/3b82f6/ffffff?text=News'
+            image_url = article_data.get('image_url', '')
+            if not image_url:
+                article_data['image_url'] = PLACEHOLDER_IMAGE
             
             result.append(article_data)
         
@@ -229,11 +232,14 @@ def debug_articles():
         result = []
         for doc in articles:
             data = doc.to_dict()
+            # Ensure image_url fallback in debug too
+            image_url = data.get('image_url', PLACEHOLDER_IMAGE)
             result.append({
                 'id': doc.id,
                 'title': data.get('title', '')[:50],
                 'category': data.get('category', ''),
-                'source': data.get('source', '')
+                'source': data.get('source', ''),
+                'image_url': image_url
             })
         
         total = len(list(db.collection('articles').stream()))
