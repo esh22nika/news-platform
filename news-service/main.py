@@ -1,9 +1,9 @@
-# news-service/main.py
+# news-service/main.py - COMPLETE FIX
 import os
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from google.cloud import firestore, storage
+from google.cloud import firestore
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -13,9 +13,8 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 logging.basicConfig(level=logging.INFO)
 
-# Initialize clients
+# Initialize Firestore
 db = firestore.Client()
-storage_client = storage.Client()
 
 # News API key
 NEWS_API_KEY = 'ae5d578c6235410d864d5be2af511cce'
@@ -26,111 +25,47 @@ def health_check():
 
 @app.route('/news/fetch', methods=['POST'])
 def fetch_news():
-    """Fetch news from external APIs and store in Firestore - Enhanced version"""
+    """Fetch news from NewsAPI and store in Firestore"""
     try:
-        # Define categories with specific search queries for better results
-        category_queries = {
-            'technology': ['tech', 'technology', 'AI', 'software', 'Apple', 'Google', 'Microsoft'],
-            'business': ['business', 'finance', 'stocks', 'economy', 'startup', 'investment'],
-            'health': ['health', 'medical', 'wellness', 'healthcare'],
-            'sports': ['sports', 'football', 'basketball', 'cricket', 'tennis'],
-            'entertainment': ['entertainment', 'movies', 'music', 'celebrity', 'hollywood'],
-            'science': ['science', 'research', 'space', 'NASA', 'climate']
-        }
+        categories = ['technology', 'business', 'sports', 'entertainment', 'science']
         
         articles_stored = 0
         articles_attempted = 0
         
-        # Method 1: Top headlines by category
-        for category in category_queries.keys():
+        for category in categories:
             try:
                 url = 'https://newsapi.org/v2/top-headlines'
                 params = {
                     'category': category,
                     'language': 'en',
-                    'pageSize': 20,  # Increased from 10
+                    'pageSize': 30,
                     'apiKey': NEWS_API_KEY
                 }
                 
+                logging.info(f"Fetching {category} articles from NewsAPI...")
                 response = requests.get(url, params=params, timeout=10)
                 
                 if response.status_code == 200:
                     data = response.json()
-                    stored = store_articles(data.get('articles', []), category)
+                    articles = data.get('articles', [])
+                    
+                    logging.info(f"Received {len(articles)} articles for {category}")
+                    
+                    stored = store_articles(articles, category)
                     articles_stored += stored
-                    articles_attempted += len(data.get('articles', []))
-                    logging.info(f"Category {category}: stored {stored} articles")
+                    articles_attempted += len(articles)
+                    
+                    logging.info(f"Category {category}: stored {stored}/{len(articles)} articles")
                 else:
-                    logging.error(f"NewsAPI error for {category}: {response.status_code}")
+                    logging.error(f"NewsAPI error for {category}: {response.status_code} - {response.text}")
                 
-                time.sleep(0.5)  # Rate limiting
+                time.sleep(1)  # Rate limiting
                 
             except Exception as e:
                 logging.error(f"Error fetching {category}: {str(e)}")
         
-        # Method 2: Search for specific tech and business keywords
-        priority_searches = {
-            'technology': ['artificial intelligence', 'machine learning', 'cryptocurrency', 'blockchain', 'cybersecurity'],
-            'business': ['stock market', 'IPO', 'merger', 'earnings', 'venture capital']
-        }
-        
-        for category, keywords in priority_searches.items():
-            for keyword in keywords:
-                try:
-                    url = 'https://newsapi.org/v2/everything'
-                    params = {
-                        'q': keyword,
-                        'language': 'en',
-                        'sortBy': 'publishedAt',
-                        'pageSize': 10,
-                        'from': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d'),
-                        'apiKey': NEWS_API_KEY
-                    }
-                    
-                    response = requests.get(url, params=params, timeout=10)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        stored = store_articles(data.get('articles', []), category)
-                        articles_stored += stored
-                        articles_attempted += len(data.get('articles', []))
-                        logging.info(f"Keyword '{keyword}': stored {stored} articles")
-                    
-                    time.sleep(0.5)  # Rate limiting
-                    
-                except Exception as e:
-                    logging.error(f"Error fetching keyword {keyword}: {str(e)}")
-        
-        # Method 3: Top sources for tech and business
-        tech_sources = 'techcrunch,the-verge,wired,ars-technica,hacker-news'
-        business_sources = 'bloomberg,financial-times,the-wall-street-journal,business-insider'
-        
-        for sources, category in [(tech_sources, 'technology'), (business_sources, 'business')]:
-            try:
-                url = 'https://newsapi.org/v2/top-headlines'
-                params = {
-                    'sources': sources,
-                    'language': 'en',
-                    'pageSize': 20,
-                    'apiKey': NEWS_API_KEY
-                }
-                
-                response = requests.get(url, params=params, timeout=10)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    stored = store_articles(data.get('articles', []), category)
-                    articles_stored += stored
-                    articles_attempted += len(data.get('articles', []))
-                    logging.info(f"Sources for {category}: stored {stored} articles")
-                
-                time.sleep(0.5)
-                
-            except Exception as e:
-                logging.error(f"Error fetching from sources: {str(e)}")
-        
         return jsonify({
-            "message": f"Successfully stored {articles_stored} articles out of {articles_attempted} attempted",
+            "message": f"Successfully stored {articles_stored} articles",
             "articles_stored": articles_stored,
             "articles_attempted": articles_attempted
         }), 200
@@ -140,46 +75,62 @@ def fetch_news():
         return jsonify({"error": str(e)}), 500
 
 def store_articles(articles, category):
-    """Helper function to store articles in Firestore"""
+    """Store articles in Firestore with deduplication"""
     stored_count = 0
     
     for article in articles:
         try:
-            # Skip articles without titles or removed content
-            if not article.get('title') or article.get('title') == '[Removed]':
+            # Skip invalid articles
+            title = article.get('title', '')
+            description = article.get('description', '')
+            
+            if not title or title == '[Removed]':
+                continue
+            if not description or description == '[Removed]':
                 continue
             
-            if not article.get('description') or article.get('description') == '[Removed]':
-                continue
-            
-            # Check if article already exists (by URL)
             url = article.get('url', '')
-            if url:
-                existing = db.collection('articles').where('url', '==', url).limit(1).stream()
-                if len(list(existing)) > 0:
-                    continue  # Skip duplicate
+            if not url:
+                continue
             
+            # Check for duplicates by URL
+            existing_query = db.collection('articles').where('url', '==', url).limit(1)
+            existing_docs = list(existing_query.stream())
+            
+            if len(existing_docs) > 0:
+                logging.info(f"Skipping duplicate: {title[:50]}")
+                continue
+            
+            # Generate unique article ID
             article_id = str(uuid.uuid4())
             
-            # Store article in Firestore
+            # Handle image URL - use placeholder for blocked images
+            image_url = article.get('urlToImage', '')
+            if not image_url or 'wsj.com' in image_url.lower():
+                image_url = 'https://via.placeholder.com/400x200/3b82f6/ffffff?text=News+Article'
+            
+            # Create article document
             article_data = {
                 'article_id': article_id,
-                'title': article.get('title', '').strip(),
-                'content': article.get('description', '').strip(),
-                'category': category,
+                'title': title.strip(),
+                'content': description.strip(),
+                'category': category.lower(),
                 'publish_date': datetime.now(),
-                'source': article.get('source', {}).get('name', ''),
-                'image_url': article.get('urlToImage', ''),
+                'source': article.get('source', {}).get('name', 'Unknown'),
+                'image_url': image_url,
                 'url': url,
                 'author': article.get('author', ''),
                 'created_at': firestore.SERVER_TIMESTAMP
             }
             
+            # Store in Firestore
             db.collection('articles').document(article_id).set(article_data)
             stored_count += 1
             
+            logging.info(f"Stored: [{category}] {title[:50]}")
+            
         except Exception as e:
-            logging.error(f"Error storing individual article: {str(e)}")
+            logging.error(f"Error storing article: {str(e)}")
             continue
     
     return stored_count
@@ -188,48 +139,80 @@ def store_articles(articles, category):
 def get_news():
     """Get news articles with optional category filter"""
     try:
-        category = request.args.get('category')
-        limit = int(request.args.get('limit', 20))
+        category = request.args.get('category', '').lower()
+        limit = int(request.args.get('limit', 30))
         
-        query = db.collection('articles').order_by('publish_date', direction=firestore.Query.DESCENDING)
+        logging.info(f"GET /news - category: '{category}', limit: {limit}")
         
-        if category:
-            query = query.where('category', '==', category)
+        # Build query
+        articles_ref = db.collection('articles')
         
-        articles = query.limit(limit).stream()
+        # Apply category filter if provided
+        if category and category != 'all' and category != '':
+            logging.info(f"Filtering by category: {category}")
+            query = articles_ref.where('category', '==', category)
+        else:
+            logging.info("No category filter - fetching all articles")
+            query = articles_ref
         
+        # Order by publish date and limit
+        query = query.order_by('publish_date', direction=firestore.Query.DESCENDING).limit(limit)
+        
+        # Execute query
+        articles_stream = query.stream()
+        articles_list = list(articles_stream)
+        
+        logging.info(f"Query returned {len(articles_list)} articles")
+        
+        # Convert to dictionary
         result = []
-        for article in articles:
-            article_data = article.to_dict()
+        for doc in articles_list:
+            article_data = doc.to_dict()
+            
             # Ensure article_id is present
             if 'article_id' not in article_data:
-                article_data['article_id'] = article.id
+                article_data['article_id'] = doc.id
+            
+            # Ensure image_url has fallback
+            if not article_data.get('image_url'):
+                article_data['image_url'] = 'https://via.placeholder.com/400x200/3b82f6/ffffff?text=News'
+            
             result.append(article_data)
         
-        logging.info(f"Returning {len(result)} articles for category: {category or 'all'}")
+        logging.info(f"Returning {len(result)} articles")
         
         return jsonify({
             "articles": result,
-            "count": len(result)
+            "count": len(result),
+            "category": category if category else "all"
         }), 200
         
     except Exception as e:
-        logging.error(f"Error getting news: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Error in get_news: {str(e)}", exc_info=True)
+        # Return empty array instead of error to prevent frontend crash
+        return jsonify({
+            "articles": [],
+            "count": 0,
+            "error": str(e)
+        }), 200
 
 @app.route('/news/count', methods=['GET'])
 def count_articles():
     """Get count of articles by category"""
     try:
-        categories = ['technology', 'business', 'health', 'sports', 'entertainment', 'science']
+        categories = ['technology', 'business', 'sports', 'entertainment', 'science']
         counts = {}
         
         for category in categories:
-            articles = db.collection('articles').where('category', '==', category).stream()
-            counts[category] = len(list(articles))
+            query = db.collection('articles').where('category', '==', category)
+            docs = list(query.stream())
+            counts[category] = len(docs)
         
-        total = sum(counts.values())
-        counts['total'] = total
+        # Total count
+        all_docs = list(db.collection('articles').stream())
+        counts['total'] = len(all_docs)
+        
+        logging.info(f"Article counts: {counts}")
         
         return jsonify(counts), 200
         
@@ -237,26 +220,31 @@ def count_articles():
         logging.error(f"Error counting articles: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/news/clear', methods=['POST'])
-def clear_old_articles():
-    """Clear articles older than 7 days (optional maintenance endpoint)"""
+@app.route('/news/debug', methods=['GET'])
+def debug_articles():
+    """Debug endpoint to see all articles"""
     try:
-        cutoff_date = datetime.now() - timedelta(days=7)
+        articles = list(db.collection('articles').limit(5).stream())
         
-        articles = db.collection('articles').where('publish_date', '<', cutoff_date).stream()
+        result = []
+        for doc in articles:
+            data = doc.to_dict()
+            result.append({
+                'id': doc.id,
+                'title': data.get('title', '')[:50],
+                'category': data.get('category', ''),
+                'source': data.get('source', '')
+            })
         
-        deleted_count = 0
-        for article in articles:
-            article.reference.delete()
-            deleted_count += 1
+        total = len(list(db.collection('articles').stream()))
         
         return jsonify({
-            "message": f"Deleted {deleted_count} old articles",
-            "deleted_count": deleted_count
+            "total_articles": total,
+            "sample_articles": result
         }), 200
         
     except Exception as e:
-        logging.error(f"Error clearing articles: {str(e)}")
+        logging.error(f"Error in debug: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
