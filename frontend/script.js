@@ -189,7 +189,7 @@ async function loadArticles(category) {
                         <p>No ${category || ''} articles found.</p>
                         <p style="margin-top: 10px; font-size: 0.9em;">Try fetching news by running:</p>
                         <code style="background: #f1f5f9; padding: 8px 12px; border-radius: 4px; display: inline-block; margin-top: 8px;">
-                            curl -X POST ${NEWS_API_URL.replace('/news', '/news/fetch')}
+                            curl -X POST https://news-service-piqssf56ka-el.a.run.app/news/fetch
                         </code>
                     </div>`;
                 allArticles = [];
@@ -278,7 +278,10 @@ function renderArticles(articles) {
         const likedClass = isLiked ? 'liked' : '';
         const likedIcon = isLiked ? '❤️' : '🤍';
         
-        const imageUrl = article.image_url || 'https://via.placeholder.com/400x200/3b82f6/ffffff?text=News+Article';
+        // FIXED: Better image URL validation and fallback
+        const imageUrl = article.image_url && article.image_url.startsWith('http') 
+            ? article.image_url 
+            : 'https://placehold.co/400x200/3b82f6/ffffff/png?text=News+Article';
         
         div.innerHTML = `
             <div class="article-image" style="background-image: url('${imageUrl}')"></div>
