@@ -439,10 +439,12 @@ body {
     color: #0f172a;
     margin-bottom: 12px;
     line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 .article-meta {
@@ -458,10 +460,12 @@ body {
     color: #475569;
     line-height: 1.6;
     margin-bottom: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
-    overflow: hidden;
 }
 
 .engagement-section {
@@ -621,3 +625,21 @@ body {
     }
 }
 
+/* Add this to your existing styles.css */
+
+.article-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.btn-like.liked {
+    background: #dc2626 !important;
+    color: white !important;
+    border-color: #dc2626 !important;
+}
