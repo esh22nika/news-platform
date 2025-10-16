@@ -5,3 +5,4 @@ google-cloud-storage==2.10.0
 requests==2.31.0
 Pillow==10.0.1
 gunicorn==21.2.0
+flask-cors
