@@ -6,8 +6,10 @@ from google.cloud import firestore, storage
 import logging
 from datetime import datetime
 import uuid
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 logging.basicConfig(level=logging.INFO)
 
 # Initialize clients
