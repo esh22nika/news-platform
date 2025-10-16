@@ -6,7 +6,7 @@
 This is a **cloud-native news delivery application** that allows users to sign up with their **name, email, and interests**, view trending news, and interact via **likes and shares**. All engagement is tracked in real time using Google Cloud services.
 
 🔗 **Live Frontend**:  
-[https://storage.googleapis.com/news-platform-demo-frontend/index.html](https://storage.googleapis.com/news-platform-demo-frontend/index.html)
+[https://storage.googleapis.com/news-platform-frontend-new/index.html)
 
 ---
 
