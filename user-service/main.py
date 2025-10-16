@@ -1,4 +1,4 @@
-# user-service/main.py
+# user-service/main.py - COMPLETE VERSION WITH ALL FIXES
 import os
 import json
 import logging
@@ -20,13 +20,15 @@ db = firestore.Client()
 # Update with YOUR project ID
 PROJECT_ID = os.environ.get('GCP_PROJECT', 'news-platform-474717')
 
-# JWT Secret - In production, use Secret Manager
+# JWT Secret
 JWT_SECRET = os.environ.get('JWT_SECRET', '8d5310675409c83dae0f321b3eb5bcb2a65387e581f4e80bef62b7cd91feee0d')
 JWT_EXPIRATION_HOURS = 240
 
 # Create Pub/Sub client
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(PROJECT_ID, "engagement-topic")
+
+logging.info(f"Pub/Sub topic path: {topic_path}")
 
 #######################################
 # Helper Functions
@@ -73,7 +75,6 @@ def require_auth(f):
         if not payload:
             return jsonify({"error": "Invalid or expired token"}), 401
         
-        # Add user info to request context
         request.user_id = payload['user_id']
         request.user_email = payload.get('email')
         request.username = payload.get('username')
@@ -83,7 +84,7 @@ def require_auth(f):
     return wrapper
 
 #######################################
-# Health check route
+# Routes
 #######################################
 
 @app.route('/health', methods=['GET'])
@@ -93,10 +94,6 @@ def health_check():
         "service": "user-service",
         "features": ["auth", "recommendations", "engagement"]
     }), 200
-
-#######################################
-# User Registration
-#######################################
 
 @app.route('/auth/register', methods=['POST', 'OPTIONS'])
 def register():
@@ -114,31 +111,38 @@ def register():
         email = data['email'].lower().strip()
         username = data['username'].strip()
         
-        # Check if user already exists
-        existing_users = db.collection('users').where('email', '==', email).limit(1).stream()
-        if len(list(existing_users)) > 0:
+        # Check if user exists
+        existing_users = list(db.collection('users').where('email', '==', email).limit(1).stream())
+        if len(existing_users) > 0:
             return jsonify({"error": "User with this email already exists"}), 409
 
         # Hash password
         hashed_password = hash_password(data['password'])
         
-        # Create user document
+        # Normalize interests to lowercase
+        interests = data['interests']
+        if isinstance(interests, str):
+            interests = [i.strip().lower() for i in interests.split(',')]
+        else:
+            interests = [i.lower() for i in interests]
+        
+        # Create user
         user_ref = db.collection('users').document()
         user_data = {
             'username': username,
             'email': email,
             'password': hashed_password,
-            'interests': data['interests'] if isinstance(data['interests'], list) else [i.strip() for i in data['interests'].split(',')],
+            'interests': interests,
             'created_at': firestore.SERVER_TIMESTAMP,
             'last_active': firestore.SERVER_TIMESTAMP
         }
 
         user_ref.set(user_data)
         
-        # Generate JWT token
+        # Generate token
         token = generate_token(user_ref.id, email, username)
 
-        logging.info(f"User registered: {email}")
+        logging.info(f"User registered: {email} with interests: {interests}")
 
         return jsonify({
             "user_id": user_ref.id,
@@ -150,10 +154,6 @@ def register():
     except Exception as e:
         logging.error(f"Error registering user: {str(e)}")
         return jsonify({"error": "Registration failed"}), 500
-
-#######################################
-# User Login
-#######################################
 
 @app.route('/auth/login', methods=['POST', 'OPTIONS'])
 def login():
@@ -168,14 +168,13 @@ def login():
 
         email = data['email'].lower().strip()
         
-        # Find user by email
-        users = db.collection('users').where('email', '==', email).limit(1).stream()
-        users_list = list(users)
+        # Find user
+        users = list(db.collection('users').where('email', '==', email).limit(1).stream())
         
-        if len(users_list) == 0:
+        if len(users) == 0:
             return jsonify({"error": "Invalid credentials"}), 401
         
-        user_doc = users_list[0]
+        user_doc = users[0]
         user_data = user_doc.to_dict()
         
         # Verify password
@@ -204,10 +203,6 @@ def login():
         logging.error(f"Error logging in: {str(e)}")
         return jsonify({"error": "Login failed"}), 500
 
-#######################################
-# Get Current User Profile (Protected)
-#######################################
-
 @app.route('/users/me', methods=['GET'])
 @require_auth
 def get_current_user():
@@ -219,7 +214,6 @@ def get_current_user():
             return jsonify({"error": "User not found"}), 404
 
         user_data = user.to_dict()
-        # Remove password from response
         user_data.pop('password', None)
         user_data['user_id'] = request.user_id
 
@@ -228,10 +222,6 @@ def get_current_user():
     except Exception as e:
         logging.error(f"Error getting user: {str(e)}")
         return jsonify({"error": "Failed to get user profile"}), 500
-
-#######################################
-# Update User Profile (Protected)
-#######################################
 
 @app.route('/users/me', methods=['PUT'])
 @require_auth
@@ -262,7 +252,7 @@ def update_current_user():
         return jsonify({"error": "Failed to update profile"}), 500
 
 #######################################
-# Engagement route → publishes to Pub/Sub (Protected)
+# ENGAGEMENT ROUTE - FIXED FOR PUB/SUB
 #######################################
 
 @app.route('/engagement', methods=['POST', 'OPTIONS'])
@@ -274,38 +264,46 @@ def handle_engagement():
     try:
         data = request.get_json()
         
-        # Ensure user_id matches authenticated user
-        data['user_id'] = request.user_id
+        # Build complete engagement event
+        event_data = {
+            'user_id': request.user_id,
+            'article_id': data.get('article_id'),
+            'event_type': data.get('event_type'),
+            'timestamp': datetime.utcnow().isoformat(),
+            'session_id': data.get('session_id', f"session_{int(datetime.now().timestamp())}"),
+            'device_type': data.get('device_type', 'web'),
+            'reading_time_seconds': data.get('reading_time_seconds', 0),
+            'scroll_depth': data.get('scroll_depth', 0.0)
+        }
         
-        # Add timestamp if not present
-        if 'timestamp' not in data:
-            data['timestamp'] = datetime.utcnow().isoformat()
-
-        # Publish JSON data to Pub/Sub topic
-        message_data = json.dumps(data).encode("utf-8")
+        logging.info(f"Publishing engagement event: {event_data}")
+        
+        # Publish to Pub/Sub
+        message_data = json.dumps(event_data).encode("utf-8")
         future = publisher.publish(topic_path, message_data)
-        message_id = future.result()
-
-        logging.info(f"Published engagement event: {data['event_type']} by user {request.user_id}")
         
-        # Update user preferences based on engagement
-        update_user_preferences(request.user_id, data)
+        try:
+            message_id = future.result(timeout=10)  # Wait up to 10 seconds
+            logging.info(f"✅ Published to Pub/Sub with message ID: {message_id}")
+        except Exception as pub_error:
+            logging.error(f"❌ Pub/Sub publish failed: {str(pub_error)}")
+            return jsonify({"error": "Failed to publish to Pub/Sub"}), 500
+        
+        # Update user preferences in Firestore (for recommendations)
+        update_user_preferences(request.user_id, event_data)
 
         return jsonify({
             "message": "Engagement tracked successfully",
-            "messageId": message_id
+            "messageId": message_id,
+            "event": event_data
         }), 200
 
     except Exception as e:
-        logging.error(f"Error publishing engagement event: {str(e)}")
-        return jsonify({"error": "Failed to track engagement"}), 500
-
-#######################################
-# Update User Preferences for Recommendations
-#######################################
+        logging.error(f"Error in handle_engagement: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to track engagement: {str(e)}"}), 500
 
 def update_user_preferences(user_id, engagement_data):
-    """Update user preferences based on engagement"""
+    """Update user preferences for recommendations"""
     try:
         pref_ref = db.collection('user_preferences').document(user_id)
         pref_doc = pref_ref.get()
@@ -325,7 +323,7 @@ def update_user_preferences(user_id, engagement_data):
                 'last_updated': firestore.SERVER_TIMESTAMP
             }
         
-        # Track liked/shared/viewed articles
+        # Track engagement
         if event_type == 'like' and article_id not in prefs.get('liked_articles', []):
             prefs.setdefault('liked_articles', []).append(article_id)
         elif event_type == 'share' and article_id not in prefs.get('shared_articles', []):
@@ -333,7 +331,7 @@ def update_user_preferences(user_id, engagement_data):
         elif event_type == 'view' and article_id not in prefs.get('viewed_articles', []):
             prefs.setdefault('viewed_articles', []).append(article_id)
         
-        # Update category scores (fetch article category from Firestore)
+        # Update category scores
         try:
             article_ref = db.collection('articles').document(article_id)
             article = article_ref.get()
@@ -342,82 +340,85 @@ def update_user_preferences(user_id, engagement_data):
                 category = article.to_dict().get('category')
                 if category:
                     category_scores = prefs.get('category_scores', {})
-                    # Different weights for different actions
                     score_increment = 3 if event_type == 'like' else (2 if event_type == 'share' else 1)
                     category_scores[category] = category_scores.get(category, 0) + score_increment
                     prefs['category_scores'] = category_scores
+                    logging.info(f"Updated category score for {category}: +{score_increment}")
         except Exception as e:
             logging.error(f"Error fetching article for preference update: {str(e)}")
         
         prefs['last_updated'] = firestore.SERVER_TIMESTAMP
         pref_ref.set(prefs)
         
-        logging.info(f"Updated preferences for user {user_id}")
+        logging.info(f"✅ Updated preferences for user {user_id}")
         
     except Exception as e:
         logging.error(f"Error updating preferences: {str(e)}")
 
 #######################################
-# Get User Recommendations (Protected)
+# RECOMMENDATIONS - FIXED
 #######################################
 
 @app.route('/users/me/recommendations', methods=['GET'])
 @require_auth
 def get_recommendations():
-    """Get personalized recommendations for user - ENHANCED"""
+    """Get personalized recommendations"""
     try:
-        # Get user profile for interests
+        logging.info(f"📊 Getting recommendations for user: {request.user_id}")
+        
+        # Get user profile
         user_ref = db.collection('users').document(request.user_id)
         user_doc = user_ref.get()
         
         if not user_doc.exists:
+            logging.error(f"User {request.user_id} not found")
             return get_popular_articles()
         
         user_data = user_doc.to_dict()
         user_interests = [i.lower().strip() for i in user_data.get('interests', [])]
         
-        # Get user preferences (engagement history)
+        logging.info(f"User interests: {user_interests}")
+        
+        if not user_interests:
+            logging.info("No interests found")
+            return get_popular_articles()
+        
+        # Get user preferences
         pref_ref = db.collection('user_preferences').document(request.user_id)
         pref_doc = pref_ref.get()
         
-        # Build category scores from both interests and engagement
+        # Build category scores
         category_scores = {}
         
-        # 1. Add base scores from registration interests (weight: 5)
+        # Base scores from interests
         for interest in user_interests:
             category_scores[interest] = category_scores.get(interest, 0) + 5
         
-        # 2. Add scores from engagement (likes, shares)
+        # Add engagement scores
+        liked_articles = []
         if pref_doc.exists:
             prefs = pref_doc.to_dict()
             engagement_scores = prefs.get('category_scores', {})
+            liked_articles = prefs.get('liked_articles', [])
             
             for category, score in engagement_scores.items():
                 category_scores[category] = category_scores.get(category, 0) + score
+            
+            logging.info(f"Engagement scores: {engagement_scores}")
+            logging.info(f"Liked articles: {len(liked_articles)}")
         
-        if not category_scores:
-            return get_popular_articles()
+        logging.info(f"Final category scores: {category_scores}")
         
-        # Get top categories sorted by score
         top_categories = sorted(category_scores.items(), key=lambda x: x[1], reverse=True)
         
-        # Track which articles to exclude
-        liked_articles = []
-        viewed_articles = []
-        if pref_doc.exists:
-            prefs = pref_doc.to_dict()
-            liked_articles = prefs.get('liked_articles', [])
-            viewed_articles = prefs.get('viewed_articles', [])
-        
-        # Fetch recommended articles
+        # Fetch articles
         recommended_articles = []
         seen_article_ids = set()
         
-        # Prioritize: 1) Liked articles, 2) Top scored categories, 3) Other interests
-        
-        # STEP 1: Include LIKED articles first (user clearly likes these)
+        # STEP 1: Liked articles
         if liked_articles:
-            for article_id in liked_articles[:10]:  # Show up to 10 liked articles
+            logging.info(f"Fetching {len(liked_articles)} liked articles")
+            for article_id in liked_articles[:10]:
                 try:
                     article_ref = db.collection('articles').document(article_id)
                     article_doc = article_ref.get()
@@ -426,28 +427,32 @@ def get_recommendations():
                         article_data = article_doc.to_dict()
                         if 'article_id' not in article_data:
                             article_data['article_id'] = article_id
-                        article_data['recommendation_score'] = 1000  # Highest priority
+                        article_data['recommendation_score'] = 1000
                         article_data['recommendation_reason'] = "You liked this"
                         article_data['is_liked'] = True
                         recommended_articles.append(article_data)
                         seen_article_ids.add(article_id)
                 except Exception as e:
-                    logging.error(f"Error fetching liked article {article_id}: {str(e)}")
+                    logging.error(f"Error fetching liked article: {str(e)}")
         
-        # STEP 2: Fetch new articles from top categories
-        for category, score in top_categories[:5]:  # Top 5 categories
+        # STEP 2: Category-based articles
+        for category, score in top_categories[:5]:
             try:
-                articles = db.collection('articles')\
+                logging.info(f"Fetching articles for category: {category}")
+                
+                articles_query = db.collection('articles')\
                     .where('category', '==', category)\
                     .order_by('publish_date', direction=firestore.Query.DESCENDING)\
-                    .limit(20)\
-                    .stream()
+                    .limit(20)
                 
-                for article in articles:
-                    article_data = article.to_dict()
-                    article_id = article.id
+                articles_list = list(articles_query.stream())
+                
+                logging.info(f"Found {len(articles_list)} articles for {category}")
+                
+                for doc in articles_list:
+                    article_data = doc.to_dict()
+                    article_id = doc.id
                     
-                    # Skip already seen articles
                     if article_id in seen_article_ids:
                         continue
                     
@@ -462,85 +467,64 @@ def get_recommendations():
                     seen_article_ids.add(article_id)
                     
             except Exception as e:
-                logging.error(f"Error fetching articles for category {category}: {str(e)}")
+                logging.error(f"Error fetching category {category}: {str(e)}")
         
-        # Sort by recommendation score (liked first, then by engagement score)
+        # Sort by score
         recommended_articles.sort(
             key=lambda x: x.get('recommendation_score', 0),
             reverse=True
         )
         
-        logging.info(f"Generated {len(recommended_articles)} recommendations for user {request.user_id}")
+        logging.info(f"✅ Generated {len(recommended_articles)} recommendations")
+        
+        if len(recommended_articles) == 0:
+            logging.warning("No recommendations found, using fallback")
+            return get_popular_articles()
         
         return jsonify({
-            "articles": recommended_articles[:30],  # Return more articles
+            "articles": recommended_articles[:30],
             "count": len(recommended_articles[:30]),
             "based_on": [cat for cat, score in top_categories[:5]]
         }), 200
         
     except Exception as e:
-        logging.error(f"Error getting recommendations: {str(e)}")
-        return get_popular_articles()
-
-def get_articles_by_interests(interests):
-    """Get articles based on user interests"""
-    try:
-        articles = []
-        for interest in interests[:3]:  # Top 3 interests
-            interest_lower = interest.lower().strip()
-            category_articles = db.collection('articles')\
-                .where('category', '==', interest_lower)\
-                .order_by('publish_date', direction=firestore.Query.DESCENDING)\
-                .limit(10)\
-                .stream()
-            
-            for article in category_articles:
-                article_data = article.to_dict()
-                if 'article_id' not in article_data:
-                    article_data['article_id'] = article.id
-                articles.append(article_data)
-        
-        return jsonify({
-            "articles": articles[:20],
-            "count": len(articles[:20]),
-            "based_on": interests
-        }), 200
-    except Exception as e:
-        logging.error(f"Error getting articles by interests: {str(e)}")
+        logging.error(f"Error getting recommendations: {str(e)}", exc_info=True)
         return get_popular_articles()
 
 def get_popular_articles():
-    """Fallback: return popular articles"""
+    """Fallback articles"""
     try:
-        articles = db.collection('articles')\
+        logging.info("Fetching popular articles")
+        
+        articles_query = db.collection('articles')\
             .order_by('publish_date', direction=firestore.Query.DESCENDING)\
-            .limit(20)\
-            .stream()
+            .limit(20)
+        
+        articles_list = list(articles_query.stream())
         
         result = []
-        for article in articles:
-            article_data = article.to_dict()
+        for doc in articles_list:
+            article_data = doc.to_dict()
             if 'article_id' not in article_data:
-                article_data['article_id'] = article.id
+                article_data['article_id'] = doc.id
             result.append(article_data)
+        
+        logging.info(f"Returning {len(result)} popular articles")
         
         return jsonify({
             "articles": result,
             "count": len(result),
             "based_on": ["popular"]
         }), 200
+        
     except Exception as e:
         logging.error(f"Error getting popular articles: {str(e)}")
         return jsonify({
             "articles": [],
             "count": 0,
             "based_on": [],
-            "error": "Failed to fetch articles"
-        }), 500
-
-#######################################
-# Flask app startup
-#######################################
+            "error": str(e)
+        }), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
