@@ -5,6 +5,8 @@ const NEWS_API_URL = "https://news-service-piqssf56ka-el.a.run.app/news";
 let authToken = null;
 let currentUserId = null;
 let currentUsername = null;
+let allArticles = []; // Store all articles for client-side filtering
+let likedArticles = new Set(); // Track liked articles
 
 function saveAuth(token, userId, username) {
     authToken = token;
@@ -16,6 +18,8 @@ function clearAuth() {
     authToken = null;
     currentUserId = null;
     currentUsername = null;
+    allArticles = [];
+    likedArticles.clear();
 }
 
 function getAuthHeaders() {
@@ -43,7 +47,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const username = document.getElementById('register-username').value;
         const email = document.getElementById('register-email').value;
         const password = document.getElementById('register-password').value;
-        const interests = document.getElementById('register-interests').value.split(',').map(i => i.trim());
+        const interestsInput = document.getElementById('register-interests').value;
+        
+        // Parse interests - handle both comma-separated and array
+        let interests;
+        if (typeof interestsInput === 'string') {
+            interests = interestsInput.split(',').map(i => i.trim().toLowerCase());
+        } else {
+            interests = interestsInput;
+        }
 
         try {
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -56,6 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 saveAuth(data.token, data.user_id, data.username);
                 showNews();
+                showToast('Welcome! Your personalized feed is ready 🎉');
             } else {
                 showMessage(data.error, 'error');
             }
@@ -80,6 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (response.ok) {
                 saveAuth(data.token, data.user_id, data.username);
                 showNews();
+                showToast('Welcome back! 👋');
             } else {
                 showMessage(data.error, 'error');
             }
@@ -99,10 +113,14 @@ document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             const category = btn.dataset.category;
+            
             if (category === 'recommended') {
                 loadRecommendations();
+            } else if (category === 'all') {
+                loadArticles(null);
             } else {
-                loadArticles(category === 'all' ? null : category);
+                // Filter by specific category
+                loadArticles(category);
             }
         });
     });
@@ -116,7 +134,13 @@ function showNews() {
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('news-section').style.display = 'block';
     document.getElementById('user-name').textContent = `Welcome, ${currentUsername}!`;
-    loadArticles();
+    
+    // Load recommendations first (personalized "For You" page)
+    loadRecommendations();
+    
+    // Set "For You" as active by default
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-category="recommended"]')?.classList.add('active');
 }
 
 function showMessage(msg, type) {
@@ -129,14 +153,27 @@ function showMessage(msg, type) {
 async function loadArticles(category) {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('news-container').innerHTML = '';
+    document.getElementById('error').style.display = 'none';
 
     try {
         let url = NEWS_API_URL;
-        if (category) url += `?category=${category}`;
+        if (category) {
+            url += `?category=${category}`;
+        }
         
         const response = await fetch(url);
         const data = await response.json();
-        renderArticles(data.articles);
+        
+        if (data.articles && data.articles.length > 0) {
+            allArticles = data.articles;
+            renderArticles(data.articles);
+            if (category) {
+                showToast(`Showing ${data.articles.length} ${category} articles`);
+            }
+        } else {
+            document.getElementById('news-container').innerHTML = 
+                '<div style="text-align: center; padding: 40px; color: #64748b;">No articles found for this category.</div>';
+        }
     } catch (err) {
         console.error(err);
         document.getElementById('error').textContent = 'Failed to load news';
@@ -149,17 +186,36 @@ async function loadArticles(category) {
 async function loadRecommendations() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('news-container').innerHTML = '';
+    document.getElementById('error').style.display = 'none';
 
     try {
         const response = await fetch(`${API_BASE_URL}/users/me/recommendations`, {
             headers: getAuthHeaders()
         });
         const data = await response.json();
-        renderArticles(data.articles);
-        showToast(`Recommendations based on: ${data.based_on.join(', ')}`);
+        
+        if (data.articles && data.articles.length > 0) {
+            allArticles = data.articles;
+            
+            // Track liked articles
+            data.articles.forEach(article => {
+                if (article.is_liked) {
+                    likedArticles.add(article.article_id);
+                }
+            });
+            
+            renderArticles(data.articles);
+            showToast(`Personalized feed based on: ${data.based_on.join(', ')}`);
+        } else {
+            // Fallback to all articles if no recommendations
+            document.getElementById('news-container').innerHTML = 
+                '<div style="text-align: center; padding: 40px; color: #64748b;">Building your personalized feed... Like some articles to improve recommendations!</div>';
+            loadArticles(null);
+        }
     } catch (err) {
         console.error(err);
-        loadArticles();
+        // Fallback to regular articles
+        loadArticles(null);
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
@@ -169,22 +225,37 @@ function renderArticles(articles) {
     const container = document.getElementById('news-container');
     container.innerHTML = '';
     
+    if (!articles || articles.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #64748b;">No articles available.</div>';
+        return;
+    }
+    
     articles.forEach(article => {
         const div = document.createElement('div');
         div.className = 'news-article';
+        
+        const isLiked = likedArticles.has(article.article_id);
+        const likedClass = isLiked ? 'liked' : '';
+        const likedIcon = isLiked ? '❤️' : '🤍';
+        
         div.innerHTML = `
-            <div class="article-image" style="background-image: url('${article.image_url || ''}')"></div>
+            <div class="article-image" style="background-image: url('${article.image_url || 'https://via.placeholder.com/400x200?text=News'}')"></div>
             <div class="article-content">
-                <span class="article-category">${article.category || ''}</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <span class="article-category">${article.category || 'General'}</span>
+                    ${article.recommendation_reason ? `<span class="article-badge">✨ ${article.recommendation_reason}</span>` : ''}
+                </div>
                 <h3 class="article-title">${article.title || 'No Title'}</h3>
                 <div class="article-meta">
-                    <span>${article.source || ''}</span>
-                    <span>${new Date(article.publish_date).toLocaleDateString()}</span>
+                    <span>${article.source || 'Unknown'}</span>
+                    <span>${article.publish_date ? new Date(article.publish_date.seconds * 1000 || article.publish_date).toLocaleDateString() : 'Recently'}</span>
                 </div>
-                <p class="article-summary">${article.content || ''}</p>
+                <p class="article-summary">${article.content || 'No description available.'}</p>
                 <div class="engagement-section">
                     <div class="engagement-buttons">
-                        <button class="btn btn-like" data-article-id="${article.article_id}">❤️ Like</button>
+                        <button class="btn btn-like ${likedClass}" data-article-id="${article.article_id}">
+                            ${likedIcon} ${isLiked ? 'Liked' : 'Like'}
+                        </button>
                         <button class="btn btn-share" data-article-id="${article.article_id}">🔗 Share</button>
                     </div>
                 </div>
@@ -193,28 +264,58 @@ function renderArticles(articles) {
         container.appendChild(div);
     });
 
+    // Add event listeners
     document.querySelectorAll('.btn-like').forEach(btn => {
-        btn.addEventListener('click', () => {
-            publishEngagement('like', btn.dataset.articleId);
-            btn.classList.add('liked');
-            showToast('Liked!');
+        btn.addEventListener('click', async (e) => {
+            const articleId = btn.dataset.articleId;
+            const wasLiked = likedArticles.has(articleId);
+            
+            if (wasLiked) {
+                // Unlike
+                likedArticles.delete(articleId);
+                btn.classList.remove('liked');
+                btn.innerHTML = '🤍 Like';
+                showToast('Removed from favorites');
+            } else {
+                // Like
+                await publishEngagement('like', articleId);
+                likedArticles.add(articleId);
+                btn.classList.add('liked');
+                btn.innerHTML = '❤️ Liked';
+                showToast('Added to favorites! Check "For You" 💖');
+            }
         });
     });
 
     document.querySelectorAll('.btn-share').forEach(btn => {
-        btn.addEventListener('click', () => {
-            publishEngagement('share', btn.dataset.articleId);
-            showToast('Shared!');
+        btn.addEventListener('click', async () => {
+            await publishEngagement('share', btn.dataset.articleId);
+            showToast('Shared! 🎉');
         });
     });
 }
 
 function filterArticles(query) {
-    document.querySelectorAll('.news-article').forEach(article => {
-        const title = article.querySelector('.article-title').textContent.toLowerCase();
-        const summary = article.querySelector('.article-summary').textContent.toLowerCase();
-        article.style.display = (title.includes(query) || summary.includes(query)) ? '' : 'none';
+    if (!query) {
+        // Show all current articles if search is empty
+        renderArticles(allArticles);
+        return;
+    }
+    
+    const filtered = allArticles.filter(article => {
+        const title = (article.title || '').toLowerCase();
+        const content = (article.content || '').toLowerCase();
+        const category = (article.category || '').toLowerCase();
+        
+        return title.includes(query) || content.includes(query) || category.includes(query);
     });
+    
+    renderArticles(filtered);
+    
+    if (filtered.length === 0) {
+        document.getElementById('news-container').innerHTML = 
+            '<div style="text-align: center; padding: 40px; color: #64748b;">No articles match your search.</div>';
+    }
 }
 
 async function publishEngagement(type, articleId) {
@@ -245,5 +346,14 @@ function scrollToTop() {
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
+// Show back to top button on scroll
+window.addEventListener('scroll', () => {
+    const btn = document.getElementById('backToTopBtn');
+    if (window.pageYOffset > 300) {
+        btn.style.display = 'block';
+    } else {
+        btn.style.display = 'none';
+    }
+});
 
 
